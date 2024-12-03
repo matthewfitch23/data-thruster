@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"log"
+	"mime/multipart"
 	"net/http"
 	"os"
 )
@@ -17,39 +18,37 @@ type AuthResponse struct {
 
 // Authenticate sends the username and password to the API and retrieves the member token
 func Authenticate(username, password string) (string, error) {
-	// Define the API URL
+	// Define the API URL.
 	url := "https://api.boxmateapp.co.uk/member/authenticate"
 
-	// Define the multipart form-data body
-	body := fmt.Sprintf(`------WebKitFormBoundaryoA6q2wZUjNogmwHC
-Content-Disposition: form-data; name="Member_Email"
+	// Create a buffer to hold the multipart form data.
+	var body bytes.Buffer
+	writer := multipart.NewWriter(&body)
 
-%s
-------WebKitFormBoundaryoA6q2wZUjNogmwHC
-Content-Disposition: form-data; name="Member_Password"
+	// Add the form fields.
+	if err := writer.WriteField("Member_Email", username); err != nil {
+		return "", fmt.Errorf("failed to write email field: %w", err)
+	}
+	if err := writer.WriteField("Member_Password", password); err != nil {
+		return "", fmt.Errorf("failed to write password field: %w", err)
+	}
 
-%s
-------WebKitFormBoundaryoA6q2wZUjNogmwHC--`, username, password)
+	// Close the writer to finalize the body.
+	if err := writer.Close(); err != nil {
+		return "", fmt.Errorf("failed to close writer: %w", err)
+	}
 
-	// Create a new POST request with the body
-	req, err := http.NewRequest("POST", url, bytes.NewBuffer([]byte(body)))
+	// Create a new POST request with the body.
+	req, err := http.NewRequest("POST", url, &body)
 	if err != nil {
 		return "", fmt.Errorf("failed to create request: %w", err)
 	}
 
-	// Set the headers
-	req.Header.Set("Host", "api.boxmateapp.co.uk")
-	req.Header.Set("Accept", "application/json, text/plain, */*")
-	req.Header.Set("Sec-Fetch-Site", "cross-site")
-	req.Header.Set("Accept-Language", "en-US,en;q=0.9")
-	req.Header.Set("Sec-Fetch-Mode", "cors")
-	req.Header.Set("Origin", "capacitor://localhost")
-	req.Header.Set("User-Agent", "Mozilla/5.0 (iPhone; CPU iPhone OS 18_2 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Mobile/15E148")
-	req.Header.Set("Connection", "keep-alive")
-	req.Header.Set("Sec-Fetch-Dest", "empty")
-	req.Header.Set("Content-Type", "multipart/form-data; boundary=----WebKitFormBoundaryoA6q2wZUjNogmwHC")
+	// Set the headers.
+	req.Header.Set("Content-Type", writer.FormDataContentType())
+	req.Header.Set("Accept", "application/json")
 
-	// Perform the HTTP request
+	// Perform the HTTP request.
 	client := &http.Client{}
 	resp, err := client.Do(req)
 	if err != nil {
@@ -57,18 +56,18 @@ Content-Disposition: form-data; name="Member_Password"
 	}
 	defer resp.Body.Close()
 
-	// Check for a successful status code
+	// Check for a successful status code.
 	if resp.StatusCode != http.StatusOK {
 		return "", fmt.Errorf("received non-OK HTTP status: %d", resp.StatusCode)
 	}
 
-	// Decode the response JSON
+	// Decode the response JSON.
 	var authResp AuthResponse
 	if err := json.NewDecoder(resp.Body).Decode(&authResp); err != nil {
 		return "", fmt.Errorf("failed to parse response: %w", err)
 	}
 
-	// Check if the authentication was successful
+	// Check if the authentication was successful.
 	if !authResp.Success {
 		return "", fmt.Errorf("authentication failed")
 	}
