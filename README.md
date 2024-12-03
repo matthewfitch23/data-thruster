@@ -1,4 +1,10 @@
-# BoxMate Export v0
+# Data Thruster 🚀
+
+> **Thruster (noun)**
+> */ˈthruhs-tər/*
+>
+> A killer CrossFit move: squat low, press high, all in one go.
+> Maximum effort, full-body power. 💪
 
 Hacky scripts to get lift rep max data out of BoxMate for your team.
 
